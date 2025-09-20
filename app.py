@@ -10,6 +10,7 @@ from io import BytesIO
 DEFAULT_WIDTH_MM = 50
 DEFAULT_HEIGHT_MM = 30
 FONT_ADJUSTMENT = 2  # for printer safety
+MIN_SPACING_RATIO = 0.1  # 10% of label height as minimum spacing
 
 # Built-in fonts
 AVAILABLE_FONTS = [
@@ -54,10 +55,13 @@ def find_max_font_size_for_multiline(lines, max_width, max_height, font_name):
         font_size += 1
 
 def draw_label_pdf(c, order_no, customer_name, font_name, width, height, font_override=0):
-    """Draw order number and customer name on PDF label with horizontal split and independent fonts."""
+    """Draw order number and customer name on PDF label with minimum spacing."""
     order_no_text = f"#{order_no.strip()}"
     customer_name_text = customer_name.strip()
-    half_height = height / 2
+    
+    # Calculate minimum spacing
+    min_spacing = height * MIN_SPACING_RATIO
+    half_height = (height - min_spacing) / 2  # top and bottom sections
 
     # --- Order No Section (top) ---
     order_lines = [order_no_text]
@@ -74,9 +78,10 @@ def draw_label_pdf(c, order_no, customer_name, font_name, width, height, font_ov
         y = start_y_order + (len(wrapped_order)-i-1)*(order_font_size + 2)
         c.drawString(x, y, line)
 
-    # --- Horizontal Line ---
+    # --- Horizontal Line with spacing ---
+    line_y = half_height + min_spacing/2
     c.setLineWidth(0.5)
-    c.line(2, half_height, width-2, half_height)
+    c.line(2, line_y, width-2, line_y)
 
     # --- Customer Name Section (bottom) ---
     words = customer_name_text.split()
@@ -115,7 +120,7 @@ def create_pdf(df, font_name, width, height, font_override=0):
 
 # === STREAMLIT UI ===
 st.title("Excel/CSV to Label PDF Generator (Order No + Customer Name)")
-st.write("Generates PDF labels with Order No on top (#prefix) and Customer Name below, separated by a horizontal line. Names with exactly 2 words are split into 2 lines.")
+st.write("Generates PDF labels with Order No on top (#prefix) and Customer Name below, separated by a horizontal line. Names with exactly 2 words are split into 2 lines. Minimum spacing ensures visual balance.")
 
 # --- User Inputs ---
 selected_font = st.selectbox("Select font", AVAILABLE_FONTS, index=AVAILABLE_FONTS.index("Courier-Bold"))
