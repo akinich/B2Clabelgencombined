@@ -97,9 +97,7 @@ def draw_label_pdf(c, order_no, customer_name, font_name, width, height, font_ov
         line_font_sizes.append(fs)
 
     total_height_cust = sum(line_font_sizes) + 2*(len(cust_lines)-1)
-    # NEW: Start customer name just below the horizontal line
-    start_y_cust = line_y - total_height_cust - 2  # 2 units margin from line
-
+    start_y_cust = (half_height - total_height_cust)/2
     for i, line in enumerate(cust_lines):
         fs = line_font_sizes[i]
         c.setFont(font_name, fs)
