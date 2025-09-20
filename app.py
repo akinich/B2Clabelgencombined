@@ -9,10 +9,9 @@ from io import BytesIO
 # === DEFAULT CONSTANTS ===
 DEFAULT_WIDTH_MM = 50
 DEFAULT_HEIGHT_MM = 30
-FONT_ADJUSTMENT = 2  # for printer safety
+FONT_ADJUSTMENT = 2
 MIN_SPACING_RATIO = 0.1  # 10% of label height as minimum spacing
 
-# Built-in fonts
 AVAILABLE_FONTS = [
     "Helvetica",
     "Helvetica-Bold",
@@ -24,14 +23,11 @@ AVAILABLE_FONTS = [
 
 # === HELPER FUNCTIONS ===
 def wrap_text_to_width(text, font_name, font_size, max_width):
-    """Wrap a single line of text into multiple lines that fit within max_width."""
     words = text.split()
     if not words:
         return [""]
-
     lines = []
     current_line = words[0]
-
     for word in words[1:]:
         test_line = f"{current_line} {word}"
         if stringWidth(test_line, font_name, font_size) <= max_width:
@@ -55,15 +51,13 @@ def find_max_font_size_for_multiline(lines, max_width, max_height, font_name):
         font_size += 1
 
 def draw_label_pdf(c, order_no, customer_name, font_name, width, height, font_override=0):
-    """Draw order number and customer name on PDF label with minimum spacing."""
     order_no_text = f"#{order_no.strip()}"
     customer_name_text = customer_name.strip()
     
-    # Calculate minimum spacing
     min_spacing = height * MIN_SPACING_RATIO
-    half_height = (height - min_spacing) / 2  # top and bottom sections
+    half_height = (height - min_spacing) / 2
 
-    # --- Order No Section (top) ---
+    # --- Order No (top) ---
     order_lines = [order_no_text]
     order_font_size = find_max_font_size_for_multiline(order_lines, width, half_height, font_name)
     order_font_size = max(order_font_size - FONT_ADJUSTMENT + font_override, 1)
@@ -78,24 +72,28 @@ def draw_label_pdf(c, order_no, customer_name, font_name, width, height, font_ov
         y = start_y_order + (len(wrapped_order)-i-1)*(order_font_size + 2)
         c.drawString(x, y, line)
 
-    # --- Horizontal Line with spacing ---
+    # --- Horizontal line ---
     line_y = half_height + min_spacing/2
     c.setLineWidth(0.5)
     c.line(2, line_y, width-2, line_y)
 
-    # --- Customer Name Section (bottom) ---
+    # --- Customer Name (bottom) ---
     words = customer_name_text.split()
     if len(words) == 2:
         cust_lines = words
+        line_font_sizes = []
+        max_height_per_line = half_height
+        # Compute each word's max font size independently
+        for line in cust_lines:
+            fs = find_max_font_size_for_multiline([line], width, max_height_per_line, font_name)
+            fs = max(fs - FONT_ADJUSTMENT + font_override, 1)
+            line_font_sizes.append(fs)
     else:
         cust_lines = [customer_name_text]
-
-    line_font_sizes = []
-    for line in cust_lines:
-        max_height_per_line = half_height / len(cust_lines)
-        fs = find_max_font_size_for_multiline([line], width, max_height_per_line, font_name)
+        max_height_per_line = half_height
+        fs = find_max_font_size_for_multiline(cust_lines, width, max_height_per_line, font_name)
         fs = max(fs - FONT_ADJUSTMENT + font_override, 1)
-        line_font_sizes.append(fs)
+        line_font_sizes = [fs]
 
     total_height_cust = sum(line_font_sizes) + 2*(len(cust_lines)-1)
     start_y_cust = (half_height - total_height_cust)/2
@@ -120,16 +118,14 @@ def create_pdf(df, font_name, width, height, font_override=0):
 
 # === STREAMLIT UI ===
 st.title("Excel/CSV to Label PDF Generator (Order No + Customer Name)")
-st.write("Generates PDF labels with Order No on top (#prefix) and Customer Name below, separated by a horizontal line. Names with exactly 2 words are split into 2 lines. Minimum spacing ensures visual balance.")
+st.write("Labels with Order No on top (#prefix) and Customer Name below. Two-word names scale independently to maximize font size. Minimum spacing ensures visual balance.")
 
-# --- User Inputs ---
 selected_font = st.selectbox("Select font", AVAILABLE_FONTS, index=AVAILABLE_FONTS.index("Courier-Bold"))
 font_override = st.slider("Font size override (+/- points)", min_value=-5, max_value=5, value=0)
 width_mm = st.number_input("Label width (mm)", min_value=10, max_value=500, value=DEFAULT_WIDTH_MM)
 height_mm = st.number_input("Label height (mm)", min_value=10, max_value=500, value=DEFAULT_HEIGHT_MM)
 remove_duplicates = st.checkbox("Remove duplicate labels", value=True)
 
-# --- File Uploader ---
 uploaded_file = st.file_uploader("Upload CSV or Excel file", type=["csv", "xlsx"])
 df = None
 if uploaded_file:
@@ -140,7 +136,6 @@ if uploaded_file:
             df = pd.read_excel(uploaded_file, engine="openpyxl")
         st.success("File loaded successfully!")
 
-        # Normalize column names
         df.columns = [col.strip().lower() for col in df.columns]
         required_cols = ["order no", "customer name"]
         missing_cols = [col for col in required_cols if col not in df.columns]
@@ -148,12 +143,9 @@ if uploaded_file:
             st.error(f"Missing required columns: {', '.join(missing_cols)}")
             df = None
 
-        # Strip whitespace
         if df is not None:
             df["order no"] = df["order no"].astype(str).str.strip()
             df["customer name"] = df["customer name"].astype(str).str.strip()
-
-            # Remove duplicates if checkbox checked
             if remove_duplicates:
                 df = df.drop_duplicates(subset=["order no", "customer name"], keep="first")
 
