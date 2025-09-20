@@ -31,7 +31,12 @@ def find_max_font_size_for_multiline(lines, max_width, max_height, font_name):
         font_size += 1
 
 def draw_label_pdf(c, text, font_name, width, height, font_override=0):
-    lines = text.split("\n")  # support multi-line text
+    # Split by newline first, then split each line by space to stack words
+    lines = []
+    for part in text.split("\n"):
+        words = part.split()
+        lines.extend(words if words else [""])
+    
     raw_font_size = find_max_font_size_for_multiline(lines, width, height, font_name)
     font_size = max(raw_font_size - FONT_ADJUSTMENT + font_override, 1)
     c.setFont(font_name, font_size)
@@ -60,7 +65,7 @@ def create_pdf(data_list, font_name, width, height, font_override=0):
 
 # === STREAMLIT UI ===
 st.title("Excel/CSV to Label PDF Generator")
-st.write("Generate multi-page PDF labels with custom settings.")
+st.write("Generate multi-page PDF labels with stacked words per cell.")
 
 # --- User Inputs ---
 selected_font = st.selectbox("Select font", AVAILABLE_FONTS, index=1)
