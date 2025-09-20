@@ -54,18 +54,9 @@ def find_max_font_size_for_multiline(lines, max_width, max_height, font_name):
         font_size += 1
 
 def draw_label_pdf(c, order_no, customer_name, font_name, width, height, font_override=0):
-    """
-    Draw order number and customer name on PDF label.
-    - Horizontal split with a line.
-    - Independent font sizes.
-    - Prepend # to order number.
-    - Customer name split into 2 lines if it has exactly 2 words.
-    """
-    # Prepend '#' to order_no
+    """Draw order number and customer name on PDF label with horizontal split and independent fonts."""
     order_no_text = f"#{order_no.strip()}"
     customer_name_text = customer_name.strip()
-
-    # Define horizontal split
     half_height = height / 2
 
     # --- Order No Section (top) ---
@@ -73,11 +64,9 @@ def draw_label_pdf(c, order_no, customer_name, font_name, width, height, font_ov
     order_font_size = find_max_font_size_for_multiline(order_lines, width, half_height, font_name)
     order_font_size = max(order_font_size - FONT_ADJUSTMENT + font_override, 1)
     c.setFont(font_name, order_font_size)
-
     wrapped_order = []
     for line in order_lines:
         wrapped_order.extend(wrap_text_to_width(line, font_name, order_font_size, width))
-
     total_height_order = len(wrapped_order) * order_font_size + (len(wrapped_order)-1)*2
     start_y_order = height - half_height + (half_height - total_height_order)/2
     for i, line in enumerate(wrapped_order):
@@ -105,7 +94,6 @@ def draw_label_pdf(c, order_no, customer_name, font_name, width, height, font_ov
 
     total_height_cust = sum(line_font_sizes) + 2*(len(cust_lines)-1)
     start_y_cust = (half_height - total_height_cust)/2
-
     for i, line in enumerate(cust_lines):
         fs = line_font_sizes[i]
         c.setFont(font_name, fs)
@@ -116,13 +104,11 @@ def draw_label_pdf(c, order_no, customer_name, font_name, width, height, font_ov
 def create_pdf(df, font_name, width, height, font_override=0):
     buffer = BytesIO()
     c = canvas.Canvas(buffer, pagesize=(width, height))
-
     for idx, row in df.iterrows():
         order_no = str(row["order no"]).strip()
         customer_name = str(row["customer name"]).strip()
         draw_label_pdf(c, order_no, customer_name, font_name, width, height, font_override)
         c.showPage()
-
     c.save()
     buffer.seek(0)
     return buffer
@@ -132,15 +118,14 @@ st.title("Excel/CSV to Label PDF Generator (Order No + Customer Name)")
 st.write("Generates PDF labels with Order No on top (#prefix) and Customer Name below, separated by a horizontal line. Names with exactly 2 words are split into 2 lines.")
 
 # --- User Inputs ---
-selected_font = st.selectbox("Select font", AVAILABLE_FONTS, index=1)
+selected_font = st.selectbox("Select font", AVAILABLE_FONTS, index=AVAILABLE_FONTS.index("Courier-Bold"))
 font_override = st.slider("Font size override (+/- points)", min_value=-5, max_value=5, value=0)
-
 width_mm = st.number_input("Label width (mm)", min_value=10, max_value=500, value=DEFAULT_WIDTH_MM)
 height_mm = st.number_input("Label height (mm)", min_value=10, max_value=500, value=DEFAULT_HEIGHT_MM)
+remove_duplicates = st.checkbox("Remove duplicate labels", value=True)
 
 # --- File Uploader ---
 uploaded_file = st.file_uploader("Upload CSV or Excel file", type=["csv", "xlsx"])
-
 df = None
 if uploaded_file:
     try:
@@ -150,15 +135,22 @@ if uploaded_file:
             df = pd.read_excel(uploaded_file, engine="openpyxl")
         st.success("File loaded successfully!")
 
-        # Normalize column names to lowercase
+        # Normalize column names
         df.columns = [col.strip().lower() for col in df.columns]
-
-        # Ensure required columns exist
         required_cols = ["order no", "customer name"]
         missing_cols = [col for col in required_cols if col not in df.columns]
         if missing_cols:
             st.error(f"Missing required columns: {', '.join(missing_cols)}")
             df = None
+
+        # Strip whitespace
+        if df is not None:
+            df["order no"] = df["order no"].astype(str).str.strip()
+            df["customer name"] = df["customer name"].astype(str).str.strip()
+
+            # Remove duplicates if checkbox checked
+            if remove_duplicates:
+                df = df.drop_duplicates(subset=["order no", "customer name"], keep="first")
 
     except Exception as e:
         st.error(f"Error reading file: {e}")
@@ -167,7 +159,6 @@ if df is not None:
     st.write("Preview of data:")
     st.dataframe(df[["order no", "customer name"]])
 
-    # --- Generate PDF ---
     if st.button("Generate PDF"):
         if df.empty:
             st.warning("No valid data found!")
