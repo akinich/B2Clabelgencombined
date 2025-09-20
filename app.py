@@ -48,7 +48,7 @@ def draw_label_pdf(c, column_texts, font_name, width, height, font_override=0):
     for text in column_texts:
         words = str(text).strip().split()
         column_lines.append(words if words else [""])
-    
+
     # Determine max font size
     raw_font_size = find_max_font_size_for_multiline(column_lines, width, height, font_name)
     font_size = max(raw_font_size - FONT_ADJUSTMENT + font_override, 1)
@@ -61,16 +61,16 @@ def draw_label_pdf(c, column_texts, font_name, width, height, font_override=0):
 
     y = start_y
     for i, lines in enumerate(column_lines):
-        # Draw words in top-to-bottom order
+        # Draw words top-to-bottom
         for line in lines:
             line_width = pdfmetrics.stringWidth(line, font_name, font_size)
             x = (width - line_width) / 2
             c.drawString(x, y, line)
             y += font_size + LINE_SPACING
-        # Draw horizontal line between columns, except after last column
+        # Draw horizontal line between columns
         if i < len(column_lines) - 1:
-            c.line(2, y + 1, width - 2, y + 1)  # small horizontal line with margin
-            y += 2  # space after line
+            c.line(2, y + 1, width - 2, y + 1)
+            y += 2  # spacing after line
 
 def create_pdf(data_list, font_name, width, height, font_override=0):
     buffer = BytesIO()
