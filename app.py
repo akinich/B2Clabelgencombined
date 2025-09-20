@@ -3,6 +3,7 @@ import pandas as pd
 from reportlab.pdfgen import canvas
 from reportlab.lib.units import mm
 from reportlab.pdfbase import pdfmetrics
+from reportlab.pdfbase.pdfmetrics import stringWidth
 from io import BytesIO
 
 # === DEFAULT CONSTANTS ===
@@ -21,33 +22,57 @@ AVAILABLE_FONTS = [
 ]
 
 # === HELPER FUNCTIONS ===
+def wrap_text_to_width(text, font_name, font_size, max_width):
+    """Wrap a single line of text into multiple lines that fit within max_width."""
+    words = text.split()
+    if not words:
+        return [""]
+
+    lines = []
+    current_line = words[0]
+
+    for word in words[1:]:
+        test_line = f"{current_line} {word}"
+        if stringWidth(test_line, font_name, font_size) <= max_width:
+            current_line = test_line
+        else:
+            lines.append(current_line)
+            current_line = word
+    lines.append(current_line)
+    return lines
+
 def find_max_font_size_for_multiline(lines, max_width, max_height, font_name):
     font_size = 1
     while True:
-        max_line_width = max(pdfmetrics.stringWidth(line, font_name, font_size) for line in lines)
-        total_height = len(lines) * font_size + (len(lines) - 1) * 2
+        wrapped_lines = []
+        for line in lines:
+            wrapped_lines.extend(wrap_text_to_width(line, font_name, font_size, max_width))
+        total_height = len(wrapped_lines) * font_size + (len(wrapped_lines) - 1) * 2
+        max_line_width = max(stringWidth(line, font_name, font_size) for line in wrapped_lines)
         if max_line_width > (max_width - 4) or total_height > (max_height - 4):
             return max(font_size - 1, 1)
         font_size += 1
 
 def draw_label_pdf(c, text, font_name, width, height, font_override=0):
-    # Split by newline first, then split each line by space to stack words
-    lines = []
-    for part in text.split("\n"):
-        words = part.split()
-        lines.extend(words if words else [""])
-    
+    # Split text by newlines only
+    lines = text.split("\n")
+
     raw_font_size = find_max_font_size_for_multiline(lines, width, height, font_name)
     font_size = max(raw_font_size - FONT_ADJUSTMENT + font_override, 1)
     c.setFont(font_name, font_size)
 
-    total_height = len(lines) * font_size + (len(lines) - 1) * 2
+    # Wrap lines to fit width
+    wrapped_lines = []
+    for line in lines:
+        wrapped_lines.extend(wrap_text_to_width(line, font_name, font_size, width))
+
+    total_height = len(wrapped_lines) * font_size + (len(wrapped_lines) - 1) * 2
     start_y = (height - total_height) / 2
 
-    for i, line in enumerate(lines):
-        line_width = pdfmetrics.stringWidth(line, font_name, font_size)
+    for i, line in enumerate(wrapped_lines):
+        line_width = stringWidth(line, font_name, font_size)
         x = (width - line_width) / 2
-        y = start_y + (len(lines) - i - 1) * (font_size + 2)
+        y = start_y + (len(wrapped_lines) - i - 1) * (font_size + 2)
         c.drawString(x, y, line)
 
 def create_pdf(data_list, font_name, width, height, font_override=0):
@@ -65,7 +90,7 @@ def create_pdf(data_list, font_name, width, height, font_override=0):
 
 # === STREAMLIT UI ===
 st.title("Excel/CSV to Label PDF Generator")
-st.write("Generate multi-page PDF labels with stacked words per cell.")
+st.write("Generate multi-page PDF labels with wrapped text per cell.")
 
 # --- User Inputs ---
 selected_font = st.selectbox("Select font", AVAILABLE_FONTS, index=1)
@@ -122,7 +147,9 @@ if df is not None:
             if not combined_values:
                 st.warning("No valid data found!")
             else:
-                pdf_buffer = create_pdf(combined_values, selected_font, width_mm*mm, height_mm*mm, font_override)
+                with st.spinner("Generating PDF..."):
+                    pdf_buffer = create_pdf(combined_values, selected_font, width_mm*mm, height_mm*mm, font_override)
+                st.success("PDF generated!")
                 st.download_button(
                     label="Download PDF",
                     data=pdf_buffer,
