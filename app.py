@@ -2,7 +2,6 @@ import streamlit as st
 import pandas as pd
 from reportlab.pdfgen import canvas
 from reportlab.lib.units import mm
-from reportlab.pdfbase import pdfmetrics
 from reportlab.pdfbase.pdfmetrics import stringWidth
 from io import BytesIO
 
@@ -132,6 +131,8 @@ remove_duplicates = st.checkbox("Remove duplicate labels", value=True)
 # --- File Uploader ---
 uploaded_file = st.file_uploader("Upload CSV or Excel file", type=["csv", "xlsx"])
 df = None
+total_entries = duplicates_removed = 0
+
 if uploaded_file:
     try:
         if uploaded_file.name.endswith(".csv"):
@@ -153,16 +154,30 @@ if uploaded_file:
             df["order no"] = df["order no"].astype(str).str.strip()
             df["customer name"] = df["customer name"].astype(str).str.strip()
 
+            # Summary before removing duplicates
+            total_entries = len(df)
+
             # Remove duplicates if checkbox checked
             if remove_duplicates:
+                before_count = len(df)
                 df = df.drop_duplicates(subset=["order no", "customer name"], keep="first")
+                duplicates_removed = before_count - len(df)
 
     except Exception as e:
         st.error(f"Error reading file: {e}")
 
 if df is not None:
+    # Preview with index starting from 1
+    df_preview = df.reset_index(drop=True)
+    df_preview.index += 1
     st.write("Preview of data:")
-    st.dataframe(df[["order no", "customer name"]])
+    st.dataframe(df_preview[["order no", "customer name"]])
+
+    # Summary section
+    st.markdown("### Summary")
+    st.write(f"- Total entries in file: {total_entries}")
+    st.write(f"- Duplicates removed: {duplicates_removed}")
+    st.write(f"- Labels/pages to be generated: {len(df)}")
 
     if st.button("Generate PDF"):
         if df.empty:
