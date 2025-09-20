@@ -37,10 +37,10 @@ def find_max_font_size_for_multiline(column_lines, max_width, max_height, font_n
 def draw_label_pdf(c, order_no_text, customer_name_text, font_name, width, height, font_override=0):
     """
     Draws a label with order number on top and customer name below.
-    Both order number and customer name can have multiple words stacked.
     """
+    # Ensure order: order number first, customer name second
     column_lines = []
-    for text in [order_no_text, customer_name_text]:
+    for text in [order_no_text, customer_name_text]:  # Order enforced here
         words = str(text).strip().split()
         column_lines.append(words if words else [""])
 
