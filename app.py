@@ -53,24 +53,56 @@ def find_max_font_size_for_multiline(lines, max_width, max_height, font_name):
             return max(font_size - 1, 1)
         font_size += 1
 
-def draw_label_pdf(c, lines, font_name, width, height, font_override=0):
-    """Draws multiple lines on PDF, centered vertically and horizontally."""
-    raw_font_size = find_max_font_size_for_multiline(lines, width, height, font_name)
-    font_size = max(raw_font_size - FONT_ADJUSTMENT + font_override, 1)
-    c.setFont(font_name, font_size)
+def draw_label_pdf(c, order_no, customer_name, font_name, width, height, font_override=0):
+    """
+    Draw order number and customer name on PDF label.
+    - Split label horizontally in two.
+    - Independent font sizes.
+    - Prepend # to order number.
+    """
+    # Prepend '#' to order_no
+    order_no_text = f"#{order_no.strip()}"
+    customer_name_text = customer_name.strip()
 
-    # Wrap lines to fit width
-    wrapped_lines = []
-    for line in lines:
-        wrapped_lines.extend(wrap_text_to_width(line, font_name, font_size, width))
+    # Define horizontal split
+    half_height = height / 2
 
-    total_height = len(wrapped_lines) * font_size + (len(wrapped_lines) - 1) * 2
-    start_y = (height - total_height) / 2
+    # --- Order No Section (top) ---
+    order_lines = [order_no_text]
+    order_font_size = find_max_font_size_for_multiline(order_lines, width, half_height, font_name)
+    order_font_size = max(order_font_size - FONT_ADJUSTMENT + font_override, 1)
+    c.setFont(font_name, order_font_size)
 
-    for i, line in enumerate(wrapped_lines):
-        line_width = stringWidth(line, font_name, font_size)
-        x = (width - line_width) / 2
-        y = start_y + (len(wrapped_lines) - i - 1) * (font_size + 2)
+    wrapped_order = []
+    for line in order_lines:
+        wrapped_order.extend(wrap_text_to_width(line, font_name, order_font_size, width))
+
+    total_height_order = len(wrapped_order) * order_font_size + (len(wrapped_order)-1)*2
+    start_y_order = height - half_height + (half_height - total_height_order)/2
+    for i, line in enumerate(wrapped_order):
+        x = (width - stringWidth(line, font_name, order_font_size))/2
+        y = start_y_order + (len(wrapped_order)-i-1)*(order_font_size + 2)
+        c.drawString(x, y, line)
+
+    # --- Horizontal Line ---
+    c.setLineWidth(0.5)
+    c.line(2, half_height, width-2, half_height)
+
+    # --- Customer Name Section (bottom) ---
+    cust_lines = [customer_name_text]
+    cust_font_size = find_max_font_size_for_multiline(cust_lines, width, half_height, font_name)
+    cust_font_size = max(cust_font_size - FONT_ADJUSTMENT + font_override, 1)
+    c.setFont(font_name, cust_font_size)
+
+    wrapped_cust = []
+    for line in cust_lines:
+        wrapped_cust.extend(wrap_text_to_width(line, font_name, cust_font_size, width))
+
+    total_height_cust = len(wrapped_cust) * cust_font_size + (len(wrapped_cust)-1)*2
+    start_y_cust = (half_height - total_height_cust)/2
+    for i, line in enumerate(wrapped_cust):
+        x = (width - stringWidth(line, font_name, cust_font_size))/2
+        y = start_y_cust + (len(wrapped_cust)-i-1)*(cust_font_size + 2)
         c.drawString(x, y, line)
 
 def create_pdf(df, font_name, width, height, font_override=0):
@@ -80,8 +112,7 @@ def create_pdf(df, font_name, width, height, font_override=0):
     for idx, row in df.iterrows():
         order_no = str(row["order no"]).strip()
         customer_name = str(row["customer name"]).strip()
-        lines = [order_no, customer_name]
-        draw_label_pdf(c, lines, font_name, width, height, font_override)
+        draw_label_pdf(c, order_no, customer_name, font_name, width, height, font_override)
         c.showPage()
 
     c.save()
@@ -90,7 +121,7 @@ def create_pdf(df, font_name, width, height, font_override=0):
 
 # === STREAMLIT UI ===
 st.title("Excel/CSV to Label PDF Generator (Order No + Customer Name)")
-st.write("Generates PDF labels with Order No on top and Customer Name below.")
+st.write("Generates PDF labels with Order No on top (#prefix) and Customer Name below, separated by a horizontal line.")
 
 # --- User Inputs ---
 selected_font = st.selectbox("Select font", AVAILABLE_FONTS, index=1)
