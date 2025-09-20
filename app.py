@@ -56,9 +56,10 @@ def find_max_font_size_for_multiline(lines, max_width, max_height, font_name):
 def draw_label_pdf(c, order_no, customer_name, font_name, width, height, font_override=0):
     """
     Draw order number and customer name on PDF label.
-    - Split label horizontally in two.
+    - Horizontal split with a line.
     - Independent font sizes.
     - Prepend # to order number.
+    - Customer name split into 2 lines if it has exactly 2 words.
     """
     # Prepend '#' to order_no
     order_no_text = f"#{order_no.strip()}"
@@ -89,20 +90,27 @@ def draw_label_pdf(c, order_no, customer_name, font_name, width, height, font_ov
     c.line(2, half_height, width-2, half_height)
 
     # --- Customer Name Section (bottom) ---
-    cust_lines = [customer_name_text]
-    cust_font_size = find_max_font_size_for_multiline(cust_lines, width, half_height, font_name)
-    cust_font_size = max(cust_font_size - FONT_ADJUSTMENT + font_override, 1)
-    c.setFont(font_name, cust_font_size)
+    words = customer_name_text.split()
+    if len(words) == 2:
+        cust_lines = words
+    else:
+        cust_lines = [customer_name_text]
 
-    wrapped_cust = []
+    line_font_sizes = []
     for line in cust_lines:
-        wrapped_cust.extend(wrap_text_to_width(line, font_name, cust_font_size, width))
+        max_height_per_line = half_height / len(cust_lines)
+        fs = find_max_font_size_for_multiline([line], width, max_height_per_line, font_name)
+        fs = max(fs - FONT_ADJUSTMENT + font_override, 1)
+        line_font_sizes.append(fs)
 
-    total_height_cust = len(wrapped_cust) * cust_font_size + (len(wrapped_cust)-1)*2
+    total_height_cust = sum(line_font_sizes) + 2*(len(cust_lines)-1)
     start_y_cust = (half_height - total_height_cust)/2
-    for i, line in enumerate(wrapped_cust):
-        x = (width - stringWidth(line, font_name, cust_font_size))/2
-        y = start_y_cust + (len(wrapped_cust)-i-1)*(cust_font_size + 2)
+
+    for i, line in enumerate(cust_lines):
+        fs = line_font_sizes[i]
+        c.setFont(font_name, fs)
+        x = (width - stringWidth(line, font_name, fs))/2
+        y = start_y_cust + (len(cust_lines)-i-1)*(fs + 2)
         c.drawString(x, y, line)
 
 def create_pdf(df, font_name, width, height, font_override=0):
@@ -121,7 +129,7 @@ def create_pdf(df, font_name, width, height, font_override=0):
 
 # === STREAMLIT UI ===
 st.title("Excel/CSV to Label PDF Generator (Order No + Customer Name)")
-st.write("Generates PDF labels with Order No on top (#prefix) and Customer Name below, separated by a horizontal line.")
+st.write("Generates PDF labels with Order No on top (#prefix) and Customer Name below, separated by a horizontal line. Names with exactly 2 words are split into 2 lines.")
 
 # --- User Inputs ---
 selected_font = st.selectbox("Select font", AVAILABLE_FONTS, index=1)
