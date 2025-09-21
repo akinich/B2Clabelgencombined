@@ -62,7 +62,7 @@ def draw_label_pdf(c, order_no, customer_name, font_name, width, height, font_ov
     min_spacing = height * MIN_SPACING_RATIO
     half_height = (height - min_spacing) / 2  # top and bottom sections
 
-    # --- Order No Section (top) ---
+    # --- Order # Section (top) ---
     order_lines = [order_no_text]
     order_font_size = find_max_font_size_for_multiline(order_lines, width, half_height, font_name)
     order_font_size = max(order_font_size - FONT_ADJUSTMENT + font_override, 1)
@@ -109,8 +109,8 @@ def create_pdf(df, font_name, width, height, font_override=0):
     buffer = BytesIO()
     c = canvas.Canvas(buffer, pagesize=(width, height))
     for idx, row in df.iterrows():
-        order_no = str(row["order no"]).strip()
-        customer_name = str(row["customer name"]).strip()
+        order_no = str(row["order #"]).strip()
+        customer_name = str(row["name"]).strip()
         draw_label_pdf(c, order_no, customer_name, font_name, width, height, font_override)
         c.showPage()
     c.save()
@@ -118,8 +118,8 @@ def create_pdf(df, font_name, width, height, font_override=0):
     return buffer
 
 # === STREAMLIT UI ===
-st.title("Excel/CSV to Label PDF Generator (Order No + Customer Name)")
-st.write("Generates PDF labels with Order No on top (#prefix) and Customer Name below, separated by a horizontal line. Names with exactly 2 words are split into 2 lines. Minimum spacing ensures visual balance.")
+st.title("Excel/CSV to Label PDF Generator (Order # + Name)")
+st.write("Generates PDF labels with Order # on top (#prefix) and Name below, separated by a horizontal line. Names with exactly 2 words are split into 2 lines. Minimum spacing ensures visual balance.")
 
 # --- User Inputs ---
 selected_font = st.selectbox("Select font", AVAILABLE_FONTS, index=AVAILABLE_FONTS.index("Courier-Bold"))
@@ -143,7 +143,7 @@ if uploaded_file:
 
         # Normalize column names
         df.columns = [col.strip().lower() for col in df.columns]
-        required_cols = ["order no", "customer name"]
+        required_cols = ["order #", "name"]
         missing_cols = [col for col in required_cols if col not in df.columns]
         if missing_cols:
             st.error(f"Missing required columns: {', '.join(missing_cols)}")
@@ -151,8 +151,8 @@ if uploaded_file:
 
         # Strip whitespace
         if df is not None:
-            df["order no"] = df["order no"].astype(str).str.strip()
-            df["customer name"] = df["customer name"].astype(str).str.strip()
+            df["order #"] = df["order #"].astype(str).str.strip()
+            df["name"] = df["name"].astype(str).str.strip()
 
             # Summary before removing duplicates
             total_entries = len(df)
@@ -160,7 +160,7 @@ if uploaded_file:
             # Remove duplicates if checkbox checked
             if remove_duplicates:
                 before_count = len(df)
-                df = df.drop_duplicates(subset=["order no", "customer name"], keep="first")
+                df = df.drop_duplicates(subset=["order #", "name"], keep="first")
                 duplicates_removed = before_count - len(df)
 
     except Exception as e:
@@ -171,7 +171,7 @@ if df is not None:
     df_preview = df.reset_index(drop=True)
     df_preview.index += 1
     st.write("Preview of data:")
-    st.dataframe(df_preview[["order no", "customer name"]])
+    st.dataframe(df_preview[["order #", "name"]])
 
     # Summary section
     st.markdown("### Summary")
