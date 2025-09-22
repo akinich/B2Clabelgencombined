@@ -56,7 +56,7 @@ def find_max_font_size_for_multiline(lines, max_width, max_height, font_name):
 def draw_label_pdf(c, order_no, customer_name, font_name, width, height, font_override=0):
     """Draw order number and customer name on PDF label with minimum spacing."""
     order_no_text = f"#{order_no.strip()}"
-    customer_name_text = customer_name.strip()
+    customer_name_text = customer_name.strip().upper()  # <--- convert to all caps
     
     # Calculate minimum spacing
     min_spacing = height * MIN_SPACING_RATIO
